@@ -11,9 +11,21 @@ type Tile = (Int, Int)
 data BoardState = BoardState {h :: Int, w :: Int, mines :: [Tile], flags :: [Tile], guesses :: [Tile]}
 
 instance Show BoardState where
-  show BoardState {..} = "|" ++ (intercalate "|\n|" $ (map . map) (charAtTile BoardState {..}) posBoard) ++ "|"
+  show BoardState {..} = hEnum ++ hBar ++ board ++ hBar ++ hEnum
     where
       posBoard = [[(y, x) :: Tile | x <- [0 .. w -1]] | y <- [0 .. h -1]]
+      hBar = " |" ++ (take w (repeat '-')) ++ "| \n"
+      hEnum = "  " ++ take (w) charEnumeration ++ " \n"
+      board = concat (zipWith (\i cs -> [i] ++ "|" ++ cs ++ "|" ++ [i] ++ "\n") charEnumeration ((map . map) ((charAtTile BoardState {..})) (posBoard)))
+
+enumerate :: [a] -> [(Int, a)]
+enumerate = zip [0 ..]
+
+charToString :: Char -> String
+charToString = (: [])
+
+charEnumeration :: String
+charEnumeration = map intToDigit [0 .. 9] ++ ['A' .. 'Z']
 
 data Result = Ongoing | Win | Loss
   deriving (Show)
@@ -31,7 +43,7 @@ getResult BoardState {..}
   | otherwise = Ongoing
 
 guessedAllGivenNoLoss :: BoardState -> Bool
-guessedAllGivenNoLoss BoardState {..} = length mines + length (getOpen BoardState{..}) == w * h
+guessedAllGivenNoLoss BoardState {..} = length mines + length (getOpen BoardState {..}) == w * h
 
 placeFlag :: BoardState -> Tile -> BoardState
 placeFlag bs tile
