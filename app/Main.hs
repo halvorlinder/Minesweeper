@@ -1,21 +1,23 @@
 module Main where
 
-import Data.Char (isNumber)
+import Data.Char (isAlpha, isNumber, ord, toLower)
 import MinesweeperLib (BoardState (..), MoveType (..), Result (..), Tile (..), alterBoard, getResult)
-import System.Random (randomIO, Random (random))
+import Parse (coordinatePred, coordinateRead)
+import System.Random (Random (random), randomIO)
 
-maxSize::Int
+maxSize :: Int
 maxSize = 32
 
 main :: IO ()
 main = do
-
   putStrLn "Width:"
-  r <- getInt ( "You need to supply a number between 0 and " ++ show maxSize ) 0 maxSize
+  r <- getBoardSizeCoord
   putStrLn "Height"
-  c <- getInt ( "You need to supply a number between 0 and " ++ show maxSize ) 0 maxSize
-  board <-createBoard r c
+  c <- getBoardSizeCoord
+  board <- createBoard r c
   game board
+  where
+    getBoardSizeCoord = getInt ("You need to supply a number between 0 and " ++ show maxSize) (read :: (String -> Int)) (all isNumber) 0 maxSize
 
 game :: BoardState -> IO ()
 game state = do
@@ -40,18 +42,20 @@ getSingleChar errorMessage pred = do
       putStrLn errorMessage
       getSingleChar errorMessage pred
 
-getInt :: String -> Int -> Int -> IO Int
-getInt message low high = do
+getInt :: String -> (String -> Int) -> (String -> Bool) -> Int -> Int -> IO Int
+getInt message translate pred low high = do
   nstr <- getLine
-  if all isNumber nstr
+  if pred nstr
     then do
-      let n = read nstr :: Int
-      if n >= low && n <= high then do return n else do
-        putStrLn message
-        getInt message low high
+      let n = translate nstr :: Int
+      if n >= low && n <= high
+        then do return n
+        else do
+          putStrLn message
+          getInt message translate pred low high
     else do
       putStrLn message
-      getInt message low high
+      getInt message translate pred low high
 
 getMoveType :: IO MoveType
 getMoveType = do
@@ -65,10 +69,12 @@ getMoveType = do
 getTile :: Int -> Int -> IO Tile
 getTile h w = do
   putStrLn "Y coordinate"
-  r <- getInt ( "You need to supply a number between 0 and " ++ show (h-1) ) 0 h
+  r <- getCoord (h -1)
   putStrLn "X coordinate"
-  c <- getInt ( "You need to supply a number between 0 and " ++ show (w-1) ) 0 w
+  c <- getCoord (w -1)
   return (r, c)
+  where
+    getCoord = getInt "You need to supply a coordinate within the board!" coordinateRead coordinatePred 0
 
 clearScreen :: IO ()
 clearScreen = putStr "\ESC[2J"
@@ -80,24 +86,32 @@ createBoard h w = do
 
 randomBombs :: Int -> Int -> IO [Tile]
 randomBombs w h = do
-  rs <- randomInts (div ( w*h ) 10) 0 ( w*h )
-  return $ map (\n -> (div n w, mod n w )) rs
+  rs <- randomInts (div (w * h) 10) 0 (w * h)
+  return $ map (\n -> (div n w, mod n w)) rs
 
 randomInts :: Int -> Int -> Int -> IO [Int]
 randomInts = randomIntsInner []
 
 randomIntsInner :: [Int] -> Int -> Int -> Int -> IO [Int]
 randomIntsInner rs n low high = do
-  if length rs == n then return rs else do
-    r <- randomInt low high
-    if r `elem` rs then (do
-      randomIntsInner rs n low high) else (do
-      randomIntsInner ( r:rs ) n low high)
+  if length rs == n
+    then return rs
+    else do
+      r <- randomInt low high
+      if r `elem` rs
+        then
+          ( do
+              randomIntsInner rs n low high
+          )
+        else
+          ( do
+              randomIntsInner (r : rs) n low high
+          )
 
 randomInt :: Int -> Int -> IO Int
 randomInt low high = do
   num <- randomIO :: IO Float
-  return $ floor (num * fromIntegral (high-low)) + low
+  return $ floor (num * fromIntegral (high - low)) + low
 
 gameOver :: Result -> IO ()
 gameOver Win = putStrLn "Win"
