@@ -28,7 +28,7 @@ charEnumeration :: String
 charEnumeration = map intToDigit [0 .. 9] ++ ['A' .. 'Z']
 
 data Result = Ongoing | Win | Loss
-  deriving (Show)
+  deriving (Show, Eq)
 
 data MoveType = Flag | Guess
 
@@ -61,11 +61,15 @@ isFlag BoardState {..} tile = tile `elem` flags
 isOpen :: BoardState -> Tile -> Bool
 isOpen bs tile = elem tile $ getOpen bs
 
+isGuess :: BoardState -> Tile -> Bool
+isGuess bs tile = elem tile $ guesses bs
+
 getOpen :: BoardState -> [Tile]
 getOpen BoardState {..} = foldl (\found guess -> star BoardState {..} guess found guess) [] guesses
 
 star :: BoardState -> Tile -> [Tile] -> Tile -> [Tile]
 star BoardState {..} start found tile
+  | isMine BoardState{..} tile = found 
   | (mineCount BoardState {..} tile == 0 && notElem tile found) = foldl (star BoardState {..} start) (tile : found) (filter (isValidTile h w) $ map (tupleSum tile) directions8)
   | elem tile found = found
   | otherwise = tile : found
@@ -92,9 +96,15 @@ mineCount bs tile = length . (filter (isMine bs)) . (filter (isValidTile (h bs) 
 
 charAtTile :: BoardState -> Tile -> Char
 charAtTile bs tile
+  | guess && mine = '*'
   | open = if n == 0 then '.' else intToDigit n
-  | isFlag bs tile = '!'
+  | flag = if result == Loss then if mine then '!' else 'X' else '!'
+  | (result /= Ongoing) && mine = '*'
   | otherwise = ' '
   where
     n = mineCount bs tile
     open = isOpen bs tile
+    flag = isFlag bs tile
+    mine = isMine bs tile
+    guess = isGuess bs tile
+    result = getResult bs
