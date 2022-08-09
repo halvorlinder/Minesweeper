@@ -47,7 +47,8 @@ guessedAllGivenNoLoss BoardState {..} = length mines + length (getOpen BoardStat
 
 placeFlag :: BoardState -> Tile -> BoardState
 placeFlag bs tile
-  | isFlag bs tile || isOpen bs tile = bs
+  | isFlag bs tile = BoardState (h bs) (w bs) (mines bs) (filter (/=tile) ( flags bs )) (guesses bs)  
+  | isOpen bs tile = bs
   | otherwise = BoardState (h bs) (w bs) (mines bs) (tile : flags bs) (guesses bs)
 
 placeGuess :: BoardState -> Tile -> BoardState

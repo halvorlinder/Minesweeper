@@ -57,7 +57,7 @@ getInt message translate pred low high = do
 
 getMoveType :: IO MoveType
 getMoveType = do
-  putStrLn "Place a Flag (F) or Guess a safe square (G)"
+  putStrLn "Place or remove a Flag (F) or Guess a safe square (G)"
   c <- getSingleChar "Invalid input, supply a single character (F|G)" (`elem` "FG")
   case c of
     'F' -> do return Flag
