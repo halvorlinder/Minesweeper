@@ -22,8 +22,6 @@ main = do
 game :: BoardState -> IO ()
 game state = do
   clearScreen
-  -- print $ guesses state
-  -- print $ flags state
   print state
   let res = getResult state
   case res of
