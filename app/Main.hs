@@ -1,6 +1,6 @@
 module Main where
 
-import Data.Char (isAlpha, isNumber, ord, toLower)
+import Data.Char (isAlpha, isNumber, ord, toLower, toUpper)
 import MinesweeperLib (BoardState (..), MoveType (..), Result (..), Tile (..), alterBoard, getResult)
 import Parse (coordinatePred, coordinateRead)
 import System.Random (Random (random), randomIO)
@@ -58,8 +58,8 @@ getInt message translate pred low high = do
 getMoveType :: IO MoveType
 getMoveType = do
   putStrLn "Place or remove a Flag (F) or Guess a safe square (G)"
-  c <- getSingleChar "Invalid input, supply a single character (F|G)" (`elem` "FG")
-  case c of
+  c <- getSingleChar "Invalid input, supply a single character (F|G)" (`elem` "FGfg")
+  case toUpper c of
     'F' -> do return Flag
     'G' -> do return Guess
     _ -> error "Could not determine MoveType"
