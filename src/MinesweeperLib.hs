@@ -47,14 +47,20 @@ guessedAllGivenNoLoss BoardState {..} = length mines + length (getOpen BoardStat
 
 placeFlag :: BoardState -> Tile -> BoardState
 placeFlag bs tile
-  | isFlag bs tile = BoardState (h bs) (w bs) (mines bs) (filter (/=tile) ( flags bs )) (guesses bs)  
+  | isFlag bs tile = BoardState (h bs) (w bs) (mines bs) (filter (/=tile) ( flags bs )) (guesses bs)
   | isOpen bs tile = bs
   | otherwise = BoardState (h bs) (w bs) (mines bs) (tile : flags bs) (guesses bs)
 
 placeGuess :: BoardState -> Tile -> BoardState
 placeGuess bs tile
+  | isOpen bs tile = expand bs tile
   | isFlag bs tile || isOpen bs tile = bs
   | otherwise = BoardState (h bs) (w bs) (mines bs) (flags bs) (tile : guesses bs)
+
+expand :: BoardState -> Tile -> BoardState
+expand BoardState{..} tile
+ | flagCount BoardState{..} tile /= mineCount BoardState{..} tile = BoardState{..}
+ | otherwise = BoardState h w mines flags ( guesses++filter ( not . isFlag BoardState{..} ) ( surrounding BoardState{..} tile ) )
 
 isFlag :: BoardState -> Tile -> Bool
 isFlag BoardState {..} tile = tile `elem` flags
@@ -70,7 +76,7 @@ getOpen BoardState {..} = foldl (\found guess -> star BoardState {..} guess foun
 
 star :: BoardState -> Tile -> [Tile] -> Tile -> [Tile]
 star BoardState {..} start found tile
-  | isMine BoardState{..} tile = found 
+  | isMine BoardState{..} tile = found
   | (mineCount BoardState {..} tile == 0 && notElem tile found) = foldl (star BoardState {..} start) (tile : found) (filter (isValidTile h w) $ map (tupleSum tile) directions8)
   | elem tile found = found
   | otherwise = tile : found
@@ -92,8 +98,17 @@ isValidTile h w (y, x) = y >= 0 && y < h && x >= 0 && x < w
 isMine :: BoardState -> Tile -> Bool
 isMine BoardState {..} tile = tile `elem` mines
 
+flagCount :: BoardState -> Tile -> Int
+flagCount = countSurrounding isFlag
+
 mineCount :: BoardState -> Tile -> Int
-mineCount bs tile = length . (filter (isMine bs)) . (filter (isValidTile (h bs) (w bs))) . map (tupleSum tile) $ directions8
+mineCount = countSurrounding isMine
+
+countSurrounding :: (BoardState -> Tile -> Bool)-> BoardState-> Tile -> Int
+countSurrounding pred  bs tile = length . filter (pred bs) $ surrounding bs tile
+
+surrounding :: BoardState -> Tile -> [Tile]
+surrounding bs tile = filter (isValidTile (h bs) (w bs)) . map (tupleSum tile) $ directions8
 
 charAtTile :: BoardState -> Tile -> Char
 charAtTile bs tile
