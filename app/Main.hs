@@ -43,7 +43,7 @@ getSingleChar errorMessage pred = do
 getInt :: String -> (String -> Int) -> (String -> Bool) -> Int -> Int -> IO Int
 getInt message translate pred low high = do
   nstr <- getLine
-  if pred nstr
+  if not (null nstr) && pred nstr
     then do
       let n = translate nstr :: Int
       if n >= low && n <= high
