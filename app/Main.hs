@@ -5,6 +5,7 @@ module Main where
 import Data.Char (isAlpha, isNumber, ord, toLower, toUpper)
 import MinesweeperLib (BoardState (..), MoveType (..), Result (..), Tile (..), alterBoard, getResult, isValidTile, tupleSum)
 import Parse (coordinatePred, coordinateRead)
+import System.IO
 import System.Random (Random (random), randomIO)
 
 data Mode = Coordinate | Cursor Tile
@@ -14,14 +15,14 @@ data Command = ModeToggle | CursorMove Tile | Move MoveType Tile
 data GameState = GameState {mode :: Mode, bs :: BoardState}
 
 instance Show GameState where
-  show (GameState (Cursor (h', w')) bs) = take realPos boardStr ++ blueBack ++ [boardStr !! realPos] ++ noBack ++ drop (realPos + 1) boardStr
+  show (GameState (Cursor (h', w')) bs) = "\n" ++ take realPos boardStr ++ blueBack ++ [boardStr !! realPos] ++ noBack ++ drop (realPos + 1) boardStr
     where
       cursorPos = w bs * h' + w'
       boardStr = show bs
       startOffset = 11 + 2 * w bs
       betweenOffset = 5
       realPos = startOffset + cursorPos + betweenOffset * h'
-  show (GameState Coordinate bs) = show bs
+  show (GameState Coordinate bs) = "\n" ++ show bs
 
 blueBack :: [Char]
 blueBack = "\ESC[48;5;57m"
@@ -43,10 +44,12 @@ main = do
   where
     getBoardSizeCoord = getInt ("You need to supply a number between 0 and " ++ show maxSize) (read :: (String -> Int)) (all isNumber) 0 maxSize
 
-doCommand :: Command -> GameState -> GameState
-doCommand ModeToggle = toggleMode
-doCommand (CursorMove tile) = moveCursor tile
-doCommand (Move moveType tile) = doMove moveType tile
+doCommand :: Command -> GameState -> IO GameState
+doCommand ModeToggle gs = toggleMode gs
+doCommand (CursorMove tile) gs = do
+  return $ moveCursor tile gs
+doCommand (Move moveType tile) gs = do
+  return $ doMove moveType tile gs
 
 doMove :: MoveType -> Tile -> GameState -> GameState
 doMove moveType tile GameState {..} = GameState mode (alterBoard moveType bs tile)
@@ -59,9 +62,13 @@ moveCursor moveTile (GameState (Cursor cursorTile) bs)
   where
     newTile = tupleSum moveTile cursorTile
 
-toggleMode :: GameState -> GameState
-toggleMode (GameState Coordinate bs) = GameState (Cursor (0, 0)) bs
-toggleMode (GameState (Cursor _) bs) = GameState Coordinate bs
+toggleMode :: GameState -> IO GameState
+toggleMode (GameState Coordinate bs) = do
+  hSetBuffering stdin NoBuffering
+  return $ GameState (Cursor (0, 0)) bs
+toggleMode (GameState (Cursor _) bs) = do
+  hSetBuffering stdin LineBuffering
+  return $ GameState Coordinate bs
 
 game :: GameState -> IO ()
 game gs = do
@@ -71,7 +78,8 @@ game gs = do
   case res of
     Ongoing -> do
       cmd <- getCommand gs
-      game $ doCommand cmd gs
+      newGs <- doCommand cmd gs
+      game newGs
     _ -> do gameOver res
 
 getCommand :: GameState -> IO Command
@@ -89,7 +97,7 @@ getCommand (GameState Coordinate bs) = do
     _ -> error "Could not determine MoveType"
 getCommand (GameState (Cursor tile) bs) = do
   putStrLn "Place or remove a Flag (F), Guess a safe square (G), move the cursor (WASD) or Toggle input mode (T)"
-  c <- getSingleChar "Invalid input, supply a single character (F|G|W|A|S|D|T)" (`elem` "FGWASDTfgwasdt")
+  c <- getSingleCharInstant "Invalid input, supply a single character (F|G|W|A|S|D|T)" (`elem` "FGWASDTfgwasdt")
   case toUpper c of
     'F' -> do
       return (Move Flag tile)
@@ -101,6 +109,15 @@ getCommand (GameState (Cursor tile) bs) = do
     'S' -> do return (CursorMove (1, 0))
     'D' -> do return (CursorMove (0, 1))
     _ -> error "Could not determine MoveType"
+
+getSingleCharInstant :: String -> (Char -> Bool) -> IO Char
+getSingleCharInstant errorMessage pred = do
+  c <- getChar
+  if pred c
+    then return c
+    else do
+      putStrLn errorMessage
+      getSingleCharInstant errorMessage pred
 
 getSingleChar :: String -> (Char -> Bool) -> IO Char
 getSingleChar errorMessage pred = do
