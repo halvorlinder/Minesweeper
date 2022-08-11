@@ -13,6 +13,22 @@ data Command = ModeToggle | CursorMove Tile | Move MoveType Tile
 
 data GameState = GameState {mode :: Mode, bs :: BoardState}
 
+instance Show GameState where
+  show (GameState (Cursor (h', w')) bs) = take realPos boardStr ++ blueBack ++ [boardStr !! realPos] ++ noBack ++ drop (realPos + 1) boardStr
+    where
+      cursorPos = w bs * h' + w'
+      boardStr = show bs
+      startOffset = 11 + 2 * w bs
+      betweenOffset = 5
+      realPos = startOffset + cursorPos + betweenOffset * h'
+  show (GameState Coordinate bs) = show bs
+
+blueBack :: [Char]
+blueBack = "\ESC[48;5;57m"
+
+noBack :: [Char]
+noBack = "\ESC[49m"
+
 maxSize :: Int
 maxSize = 32
 
@@ -48,14 +64,14 @@ toggleMode (GameState Coordinate bs) = GameState (Cursor (0, 0)) bs
 toggleMode (GameState (Cursor _) bs) = GameState Coordinate bs
 
 game :: GameState -> IO ()
-game GameState {..} = do
+game gs = do
   clearScreen
-  print bs
-  let res = getResult bs
+  print gs
+  let res = getResult $ bs gs
   case res of
     Ongoing -> do
-      cmd <- getCommand GameState {..}
-      game $ doCommand cmd GameState {..}
+      cmd <- getCommand gs
+      game $ doCommand cmd gs
     _ -> do gameOver res
 
 getCommand :: GameState -> IO Command
