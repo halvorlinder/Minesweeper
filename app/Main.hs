@@ -1,9 +1,17 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Main where
 
 import Data.Char (isAlpha, isNumber, ord, toLower, toUpper)
-import MinesweeperLib (BoardState (..), MoveType (..), Result (..), Tile (..), alterBoard, getResult)
+import MinesweeperLib (BoardState (..), MoveType (..), Result (..), Tile (..), alterBoard, getResult, isValidTile, tupleSum)
 import Parse (coordinatePred, coordinateRead)
 import System.Random (Random (random), randomIO)
+
+data Mode = Coordinate | Cursor Tile
+
+data Command = ModeToggle | CursorMove Tile | Move MoveType Tile
+
+data GameState = GameState {mode :: Mode, bs :: BoardState}
 
 maxSize :: Int
 maxSize = 32
@@ -15,21 +23,68 @@ main = do
   putStrLn "Height"
   c <- getBoardSizeCoord
   board <- createBoard r c
-  game board
+  game (GameState Coordinate board)
   where
     getBoardSizeCoord = getInt ("You need to supply a number between 0 and " ++ show maxSize) (read :: (String -> Int)) (all isNumber) 0 maxSize
 
-game :: BoardState -> IO ()
-game state = do
+doCommand :: Command -> GameState -> GameState
+doCommand ModeToggle = toggleMode
+doCommand (CursorMove tile) = moveCursor tile
+doCommand (Move moveType tile) = doMove moveType tile
+
+doMove :: MoveType -> Tile -> GameState -> GameState
+doMove moveType tile GameState {..} = GameState mode (alterBoard moveType bs tile)
+
+moveCursor :: Tile -> GameState -> GameState
+moveCursor _ (GameState Coordinate _) = error "Cannot move cursor in Coordinate mode"
+moveCursor moveTile (GameState (Cursor cursorTile) bs)
+  | isValidTile (h bs) (w bs) newTile = GameState (Cursor newTile) bs
+  | otherwise = GameState (Cursor cursorTile) bs
+  where
+    newTile = tupleSum moveTile cursorTile
+
+toggleMode :: GameState -> GameState
+toggleMode (GameState Coordinate bs) = GameState (Cursor (0, 0)) bs
+toggleMode (GameState (Cursor _) bs) = GameState Coordinate bs
+
+game :: GameState -> IO ()
+game GameState {..} = do
   clearScreen
-  print state
-  let res = getResult state
+  print bs
+  let res = getResult bs
   case res of
     Ongoing -> do
-      mt <- getMoveType
-      tile <- getTile (h state) (w state)
-      game (alterBoard mt state tile)
+      cmd <- getCommand GameState {..}
+      game $ doCommand cmd GameState {..}
     _ -> do gameOver res
+
+getCommand :: GameState -> IO Command
+getCommand (GameState Coordinate bs) = do
+  putStrLn "Place or remove a Flag (F), Guess a safe square (G), or Toggle input mode (T)"
+  c <- getSingleChar "Invalid input, supply a single character (F|G|T)" (`elem` "FGTfgt")
+  case toUpper c of
+    'F' -> do
+      tile <- getTile (h bs) (w bs)
+      return (Move Flag tile)
+    'G' -> do
+      tile <- getTile (h bs) (w bs)
+      return (Move Guess tile)
+    'T' -> do return ModeToggle
+    _ -> error "Could not determine MoveType"
+getCommand (GameState (Cursor tile) bs) = do
+  putStrLn "Place or remove a Flag (F), Guess a safe square (G), move the cursor (WASD) or Toggle input mode (T)"
+  c <- getSingleChar "Invalid input, supply a single character (F|G|W|A|S|D|T)" (`elem` "FGWASDTfgwasdt")
+  case toUpper c of
+    'F' -> do
+      return (Move Flag tile)
+    'G' -> do
+      return (Move Guess tile)
+    'T' -> do return ModeToggle
+    'W' -> do return (CursorMove (-1, 0))
+    'A' -> do return (CursorMove (0, -1))
+    'S' -> do return (CursorMove (1, 0))
+    'D' -> do return (CursorMove (0, 1))
+    _ -> error "Could not determine MoveType"
 
 getSingleChar :: String -> (Char -> Bool) -> IO Char
 getSingleChar errorMessage pred = do

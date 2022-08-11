@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module MinesweeperLib (BoardState (..), Tile (..), Result (..), MoveType (..), getResult, alterBoard) where
+module MinesweeperLib (BoardState (..), Tile (..), Result (..), MoveType (..), getResult, alterBoard, isValidTile, tupleSum) where
 
 import Data.Char
 import Data.List (intercalate, nub)
